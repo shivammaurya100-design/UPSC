@@ -89,3 +89,7 @@ server/.vercel/
 .env
 .env.local
 .env.production
+
+# Admin panel build output
+admin/dist/
+admin/.vercel/

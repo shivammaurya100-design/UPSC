@@ -9,6 +9,7 @@ import mcqRoutes from './routes/mcqs';
 import flashcardRoutes from './routes/flashcards';
 import communityRoutes from './routes/community';
 import caRoutes from './routes/ca';
+import adminRoutes from './routes/admin';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -19,7 +20,7 @@ const USE_SUPABASE = !!process.env.SUPABASE_URL && !!process.env.SUPABASE_SERVIC
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Admin-Secret'],
 }));
 
 app.use(express.json({ limit: '10mb' }));
@@ -44,6 +45,7 @@ app.use('/mcqs', mcqRoutes);
 app.use('/flashcards', flashcardRoutes);
 app.use('/community', communityRoutes);
 app.use('/ca', caRoutes);
+app.use('/admin', adminRoutes);
 
 // ─── 404 Handler ───────────────────────────────────────────────────
 
