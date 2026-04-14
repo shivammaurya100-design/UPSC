@@ -1,10 +1,9 @@
 // UPSC Pathfinder API — Main Entry Point
+// Supports dual mode: Supabase (production) or SQLite (development fallback)
 
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import { initDB } from './utils/db';
-import { seed } from './data/seed';
 import authRoutes from './routes/auth';
 import mcqRoutes from './routes/mcqs';
 import flashcardRoutes from './routes/flashcards';
@@ -13,6 +12,7 @@ import caRoutes from './routes/ca';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
+const USE_SUPABASE = !!process.env.SUPABASE_URL && !!process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 // ─── Middleware ───────────────────────────────────────────────────
 
@@ -32,7 +32,8 @@ app.get('/health', (_req, res) => {
     success: true,
     message: 'UPSC Pathfinder API is running',
     timestamp: new Date().toISOString(),
-    version: '1.0.0',
+    version: '2.0.0',
+    database: USE_SUPABASE ? 'supabase' : 'sqlite',
   });
 });
 
@@ -59,16 +60,13 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 
 // ─── Start ─────────────────────────────────────────────────────────
 
-initDB();
-seed();
-
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`
-  ╔═══════════════════════════════════════════╗
-  ║   UPSC Pathfinder API                     ║
-  ║   Running on http://localhost:${PORT}        ║
-  ║   Environment: ${(process.env.NODE_ENV || 'development').padEnd(25)}║
-  ╚═══════════════════════════════════════════╝
+  ╔═══════════════════════════════════════════════════════╗
+  ║   UPSC Pathfinder API v2.0                           ║
+  ║   Running on http://localhost:${PORT}                  ║
+  ║   Database: ${(USE_SUPABASE ? 'Supabase (PostgreSQL)' : 'SQLite (fallback)').padEnd(35)}║
+  ╚═══════════════════════════════════════════════════════╝
   `);
 });
 

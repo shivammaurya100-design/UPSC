@@ -1,154 +1,120 @@
-// Community service — posts, comments, upvoting
+// Community service — posts, comments, upvoting via Supabase
 
 import { v4 as uuidv4 } from 'uuid';
-import { getOne, getAll, run } from '../utils/db';
-import { CommunityPost, Comment } from '../types';
+import { supabaseAdmin } from '../utils/supabase';
 
-interface DBPost {
+export interface CommunityPost {
   id: string;
-  user_id: string;
-  author_name: string;
-  author_title: string | null;
+  userId: string;
+  authorName: string;
+  authorTitle?: string;
   type: string;
   title: string;
   body: string;
-  tags: string;
+  tags: string[];
   upvotes: number;
   comments: number;
   views: number;
-  created_at: string;
-  is_pinned: number;
+  createdAt: string;
+  isPinned?: boolean;
 }
 
-function toPost(p: DBPost): CommunityPost {
-  return {
-    id: p.id,
-    userId: p.user_id,
-    authorName: p.author_name,
-    authorTitle: p.author_title || undefined,
-    type: p.type as any,
-    title: p.title,
-    body: p.body,
-    tags: JSON.parse(p.tags || '[]'),
-    upvotes: p.upvotes,
-    comments: p.comments,
-    views: p.views,
-    createdAt: p.created_at,
-    isPinned: p.is_pinned === 1,
-  };
-}
-
-interface DBComment {
+export interface Comment {
   id: string;
-  post_id: string;
-  user_id: string;
-  author_name: string;
+  postId: string;
+  userId: string;
+  authorName: string;
   body: string;
   upvotes: number;
-  created_at: string;
+  createdAt: string;
 }
 
-function toComment(c: DBComment): Comment {
+function toPost(r: any): CommunityPost {
   return {
-    id: c.id,
-    postId: c.post_id,
-    userId: c.user_id,
-    authorName: c.author_name,
-    body: c.body,
-    upvotes: c.upvotes,
-    createdAt: c.created_at,
+    id: r.id, userId: r.user_id, authorName: r.author_name,
+    authorTitle: r.author_title ?? undefined,
+    type: r.type, title: r.title, body: r.body,
+    tags: r.tags || [],
+    upvotes: r.upvotes, comments: r.comments, views: r.views,
+    createdAt: r.created_at, isPinned: r.is_pinned,
   };
 }
 
-export interface CreatePostInput {
-  type: 'strategy' | 'question' | 'discussion' | 'resource';
-  title: string;
-  body: string;
-  tags: string[];
-  authorName: string;
+function toComment(r: any): Comment {
+  return {
+    id: r.id, postId: r.post_id, userId: r.user_id,
+    authorName: r.author_name, body: r.body,
+    upvotes: r.upvotes, createdAt: r.created_at,
+  };
 }
 
-export function createPost(userId: string, input: CreatePostInput): CommunityPost {
-  const id = uuidv4();
-  run(
-    `INSERT INTO community_posts (id, user_id, author_name, type, title, body, tags)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [id, userId, input.authorName, input.type, input.title, input.body, JSON.stringify(input.tags)]
-  );
-  return getPostById(id)!;
+export async function createPost(userId: string, input: any): Promise<CommunityPost> {
+  const { data } = await supabaseAdmin.from('community_posts').insert({
+    id: uuidv4(), user_id: userId, ...input,
+  } as any).select().single();
+  return toPost(data);
 }
 
-export function getPosts(type?: string, page = 1, limit = 20): CommunityPost[] {
+export async function getPosts(type?: string, page = 1, limit = 20) {
   const offset = (page - 1) * limit;
-  const where = type ? `WHERE type = ?` : '';
-  const params = type ? [type, limit, offset] : [limit, offset];
+  let query = supabaseAdmin
+    .from('community_posts').select('*')
+    .order('is_pinned', { ascending: false })
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1);
 
-  return getAll<DBPost>(
-    `SELECT * FROM community_posts ${where} ORDER BY is_pinned DESC, created_at DESC LIMIT ? OFFSET ?`,
-    params
-  ).map(toPost);
+  if (type) query = query.eq('type', type);
+
+  const { data } = await query;
+  return (data || []).map(toPost);
 }
 
-export function getPostById(id: string): CommunityPost | null {
-  // Increment view count
-  run('UPDATE community_posts SET views = views + 1 WHERE id = ?', [id]);
-  const p = getOne<DBPost>('SELECT * FROM community_posts WHERE id = ?', [id]);
-  return p ? toPost(p) : null;
+export async function getPostById(id: string): Promise<CommunityPost | null> {
+  try { await supabaseAdmin.rpc('increment_views', { post_id: id }); } catch { /* ignore */ }
+  const { data } = await supabaseAdmin.from('community_posts').select('*').eq('id', id).single();
+  return data ? toPost(data) : null;
 }
 
-export function upvotePost(postId: string): number {
-  run('UPDATE community_posts SET upvotes = upvotes + 1 WHERE id = ?', [postId]);
-  const p = getOne<DBPost>('SELECT upvotes FROM community_posts WHERE id = ?', [postId]);
-  return p?.upvotes ?? 0;
+export async function upvotePost(postId: string): Promise<number> {
+  const { data } = await supabaseAdmin
+    .from('community_posts').select('upvotes').eq('id', postId).single();
+  const newCount = (data?.upvotes ?? 0) + 1;
+  await supabaseAdmin.from('community_posts').update({ upvotes: newCount } as any).eq('id', postId);
+  return newCount;
 }
 
-export function getComments(postId: string): Comment[] {
-  return getAll<DBComment>(
-    'SELECT * FROM comments WHERE post_id = ? ORDER BY upvotes DESC, created_at ASC',
-    [postId]
-  ).map(toComment);
+export async function getComments(postId: string): Promise<Comment[]> {
+  const { data } = await supabaseAdmin
+    .from('comments').select('*')
+    .eq('post_id', postId)
+    .order('upvotes', { ascending: false })
+    .order('created_at', { ascending: true });
+  return (data || []).map(toComment);
 }
 
-export function createComment(userId: string, postId: string, authorName: string, body: string): Comment {
-  const id = uuidv4();
-  run(
-    `INSERT INTO comments (id, post_id, user_id, author_name, body) VALUES (?, ?, ?, ?, ?)`,
-    [id, postId, userId, authorName, body]
-  );
-  run('UPDATE community_posts SET comments = comments + 1 WHERE id = ?', [postId]);
-  const d = getOne<DBComment>('SELECT * FROM comments WHERE id = ?', [id])!;
-  return toComment(d);
+export async function createComment(userId: string, postId: string, authorName: string, body: string): Promise<Comment> {
+  const { data } = await supabaseAdmin.from('comments').insert({
+    id: uuidv4(), post_id: postId, user_id: userId,
+    author_name: authorName, body,
+  } as any).select().single();
+
+  try { await supabaseAdmin.rpc('increment_comments', { post_id: postId }); } catch { /* ignore */ }
+  return toComment(data);
 }
 
-export function upvoteComment(commentId: string): number {
-  run('UPDATE comments SET upvotes = upvotes + 1 WHERE id = ?', [commentId]);
-  const c = getOne<DBComment>('SELECT upvotes FROM comments WHERE id = ?', [commentId]);
-  return c?.upvotes ?? 0;
+export async function upvoteComment(commentId: string): Promise<number> {
+  const { data } = await supabaseAdmin
+    .from('comments').select('upvotes').eq('id', commentId).single();
+  const newCount = (data?.upvotes ?? 0) + 1;
+  await supabaseAdmin.from('comments').update({ upvotes: newCount } as any).eq('id', commentId);
+  return newCount;
 }
 
-export function searchPosts(query: string, limit = 20): CommunityPost[] {
+export async function searchPosts(query: string, limit = 20): Promise<CommunityPost[]> {
   const q = `%${query.toLowerCase()}%`;
-  return getAll<DBPost>(
-    `SELECT * FROM community_posts
-     WHERE LOWER(title) LIKE ? OR LOWER(body) LIKE ? OR LOWER(tags) LIKE ?
-     ORDER BY upvotes DESC LIMIT ?`,
-    [q, q, q, limit]
-  ).map(toPost);
+  const { data } = await supabaseAdmin
+    .from('community_posts').select('*')
+    .or(`title.ilike.${q},body.ilike.${q}`)
+    .order('upvotes', { ascending: false }).limit(limit);
+  return (data || []).map(toPost);
 }
-
-// Seed mock posts
-export function seedPosts(posts: CommunityPost[]) {
-  const insert = db.transaction((items: CommunityPost[]) => {
-    for (const p of items) {
-      run(
-        `INSERT OR IGNORE INTO community_posts (id, user_id, author_name, author_title, type, title, body, tags, upvotes, comments, views, is_pinned)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [p.id, p.userId ?? 'system', p.authorName, p.authorTitle ?? null, p.type, p.title, p.body, JSON.stringify(p.tags), p.upvotes, p.comments, p.views, p.isPinned ? 1 : 0]
-      );
-    }
-  });
-  insert(posts);
-}
-
-// Import db for seedPosts
-import { db } from '../utils/db';

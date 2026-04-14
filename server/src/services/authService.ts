@@ -1,42 +1,22 @@
-// Auth service — register, login, JWT management
+// Auth service — register, login, JWT management via Supabase Auth
 
-import bcrypt from 'bcryptjs';
-import { v4 as uuidv4 } from 'uuid';
-import { db, getOne, run } from '../utils/db';
+import { supabaseAdmin } from '../utils/supabase';
 import { signToken } from '../middleware/auth';
-import { User } from '../types';
 
-const SALT_ROUNDS = parseInt(process.env.SALT_ROUNDS || '12', 10);
-
-interface DBUser {
-  id: string;
-  email: string;
-  password_hash: string;
-  name: string;
-  exam_stage: string;
-  target_year: number;
-  optional_subject: string | null;
-  daily_goal_minutes: number;
-  streak_days: number;
-  xp: number;
-  created_at: string;
-  updated_at: string;
-}
-
-function toUser(dbUser: DBUser): User {
-  return {
-    id: dbUser.id,
-    email: dbUser.email,
-    passwordHash: dbUser.password_hash,
-    name: dbUser.name,
-    examStage: dbUser.exam_stage as any,
-    targetYear: dbUser.target_year,
-    optionalSubject: dbUser.optional_subject || undefined,
-    dailyGoalMinutes: dbUser.daily_goal_minutes,
-    streakDays: dbUser.streak_days,
-    xp: dbUser.xp,
-    createdAt: dbUser.created_at,
-    updatedAt: dbUser.updated_at,
+export interface AuthResult {
+  token: string;
+  user: {
+    id: string;
+    email: string;
+    name: string;
+    examStage: string;
+    targetYear: number;
+    optionalSubject?: string;
+    dailyGoalMinutes: number;
+    streakDays: number;
+    xp: number;
+    createdAt: string;
+    updatedAt: string;
   };
 }
 
@@ -53,85 +33,89 @@ export interface LoginInput {
   password: string;
 }
 
-export interface AuthResult {
-  token: string;
-  user: Omit<User, 'passwordHash'>;
+function toUser(data: any): AuthResult['user'] {
+  return {
+    id: data.id,
+    email: data.email,
+    name: data.name,
+    examStage: data.exam_stage,
+    targetYear: data.target_year,
+    optionalSubject: data.optional_subject ?? undefined,
+    dailyGoalMinutes: data.daily_goal_minutes,
+    streakDays: data.streak_days,
+    xp: data.xp,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
+  };
 }
 
 export async function register(input: RegisterInput): Promise<AuthResult> {
-  const existing = getOne<DBUser>('SELECT id FROM users WHERE email = ?', [input.email.toLowerCase()]);
-  if (existing) {
-    throw new Error('Email already registered');
+  const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+    email: input.email.toLowerCase(),
+    password: input.password,
+    email_confirm: true,
+    user_metadata: { name: input.name || '' },
+  });
+
+  if (authError || !authData.user) {
+    throw new Error(authError?.message || 'Registration failed');
   }
 
-  const passwordHash = await bcrypt.hash(input.password, SALT_ROUNDS);
-  const userId = uuidv4();
+  const userId = authData.user.id;
 
-  run(
-    `INSERT INTO users (id, email, password_hash, name, exam_stage, target_year, daily_goal_minutes, xp)
-     VALUES (?, ?, ?, ?, ?, ?, 60, 0)`,
-    [
-      userId,
-      input.email.toLowerCase(),
-      passwordHash,
-      input.name || '',
-      input.examStage || 'prelims',
-      input.targetYear || new Date().getFullYear() + 1,
-    ]
-  );
+  await supabaseAdmin.from('profiles').upsert({
+    id: userId,
+    email: input.email.toLowerCase(),
+    name: input.name || '',
+    exam_stage: input.examStage || 'prelims',
+    target_year: input.targetYear || new Date().getFullYear() + 1,
+    daily_goal_minutes: 60,
+    xp: 0,
+    streak_days: 0,
+  } as any);
 
-  // Initialize practice stats and streak for new user
-  run('INSERT INTO practice_stats (id, user_id) VALUES (?, ?)', [uuidv4(), userId]);
-  run('INSERT INTO study_streaks (id, user_id) VALUES (?, ?)', [uuidv4(), userId]);
+  await supabaseAdmin.from('practice_stats').upsert({ user_id: userId } as any);
+  await supabaseAdmin.from('study_streaks').upsert({ user_id: userId } as any);
 
-  const user = getOne<DBUser>('SELECT * FROM users WHERE id = ?', [userId])!;
-  const token = signToken({ userId, email: user.email });
-
-  const { passwordHash: _, ...safeUser } = toUser(user);
-  return { token, user: safeUser };
+  const profile = await getProfile(userId);
+  const token = signToken({ userId, email: input.email.toLowerCase() });
+  return { token, user: profile! };
 }
 
 export async function login(input: LoginInput): Promise<AuthResult> {
-  const user = getOne<DBUser>('SELECT * FROM users WHERE email = ?', [input.email.toLowerCase()]);
-  if (!user) {
+  const { data: authData, error: authError } = await supabaseAdmin.auth.signInWithPassword({
+    email: input.email.toLowerCase(),
+    password: input.password,
+  });
+
+  if (authError || !authData.user) {
     throw new Error('Invalid email or password');
   }
 
-  const isValid = await bcrypt.compare(input.password, user.password_hash);
-  if (!isValid) {
-    throw new Error('Invalid email or password');
-  }
-
-  const token = signToken({ userId: user.id, email: user.email });
-  const { passwordHash: _, ...safeUser } = toUser(user);
-  return { token, user: safeUser };
+  const profile = await getProfile(authData.user.id);
+  const token = signToken({ userId: authData.user.id, email: authData.user.email! });
+  return { token, user: profile! };
 }
 
-export async function getProfile(userId: string): Promise<Omit<User, 'passwordHash'> | null> {
-  const user = getOne<DBUser>('SELECT * FROM users WHERE id = ?', [userId]);
-  if (!user) return null;
-  const { passwordHash: _, ...safeUser } = toUser(user);
-  return safeUser;
+export async function getProfile(userId: string): Promise<AuthResult['user'] | null> {
+  const { data } = await supabaseAdmin.from('profiles').select('*').eq('id', userId).single();
+  if (!data) return null;
+  return toUser(data);
 }
 
 export async function updateProfile(
   userId: string,
-  updates: Partial<Pick<User, 'name' | 'examStage' | 'targetYear' | 'optionalSubject' | 'dailyGoalMinutes'>>
-): Promise<Omit<User, 'passwordHash'> | null> {
-  const fields: string[] = [];
-  const values: any[] = [];
+  updates: Partial<AuthResult['user']>
+): Promise<AuthResult['user'] | null> {
+  const dbUpdates: Record<string, any> = {};
+  if (updates.name !== undefined) dbUpdates.name = updates.name;
+  if (updates.examStage !== undefined) dbUpdates.exam_stage = updates.examStage;
+  if (updates.targetYear !== undefined) dbUpdates.target_year = updates.targetYear;
+  if (updates.optionalSubject !== undefined) dbUpdates.optional_subject = updates.optionalSubject;
+  if (updates.dailyGoalMinutes !== undefined) dbUpdates.daily_goal_minutes = updates.dailyGoalMinutes;
 
-  if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name); }
-  if (updates.examStage !== undefined) { fields.push('exam_stage = ?'); values.push(updates.examStage); }
-  if (updates.targetYear !== undefined) { fields.push('target_year = ?'); values.push(updates.targetYear); }
-  if (updates.optionalSubject !== undefined) { fields.push('optional_subject = ?'); values.push(updates.optionalSubject); }
-  if (updates.dailyGoalMinutes !== undefined) { fields.push('daily_goal_minutes = ?'); values.push(updates.dailyGoalMinutes); }
+  if (Object.keys(dbUpdates).length === 0) return getProfile(userId);
 
-  if (fields.length === 0) return getProfile(userId);
-
-  fields.push("updated_at = datetime('now')");
-  values.push(userId);
-
-  run(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`, values);
+  await supabaseAdmin.from('profiles').update({ ...dbUpdates, updated_at: new Date().toISOString() } as any).eq('id', userId);
   return getProfile(userId);
 }

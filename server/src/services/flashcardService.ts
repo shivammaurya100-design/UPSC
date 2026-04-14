@@ -1,37 +1,20 @@
-// Flashcard service — SM-2 spaced repetition algorithm
+// Flashcard service — SM-2 spaced repetition algorithm via Supabase
 
 import { v4 as uuidv4 } from 'uuid';
-import { getOne, getAll, run } from '../utils/db';
-import { FlashcardSRS } from '../types';
+import { supabaseAdmin } from '../utils/supabase';
 
-interface DBFlashcardSRS {
+export interface FlashcardSRS {
   id: string;
-  user_id: string;
-  card_id: string;
-  ease_factor: number;
+  userId: string;
+  cardId: string;
+  easeFactor: number;
   interval: number;
   repetitions: number;
-  next_review: string;
-  last_reviewed: string;
+  nextReview: string;
+  lastReviewed: string;
 }
 
-function toSRS(d: DBFlashcardSRS): FlashcardSRS {
-  return {
-    id: d.id,
-    userId: d.user_id,
-    cardId: d.card_id,
-    easeFactor: d.ease_factor,
-    interval: d.interval,
-    repetitions: d.repetitions,
-    nextReview: d.next_review,
-    lastReviewed: d.last_reviewed,
-  };
-}
-
-// ─── SM-2 Algorithm ────────────────────────────────────────────────
-// rating: 0-5 (0=complete blackout → 5=perfect response)
-// Returns { easeFactor, interval, repetitions, nextReview }
-
+// SM-2 Algorithm
 export function sm2(
   rating: number,
   prevEaseFactor: number,
@@ -43,24 +26,16 @@ export function sm2(
   let repetitions = prevRepetitions;
 
   if (rating < 3) {
-    // Reset on failure
     repetitions = 0;
     interval = 1;
   } else {
-    if (repetitions === 0) {
-      interval = 1;
-    } else if (repetitions === 1) {
-      interval = 6;
-    } else {
-      interval = Math.round(prevInterval * easeFactor);
-    }
+    if (repetitions === 0) interval = 1;
+    else if (repetitions === 1) interval = 6;
+    else interval = Math.round(prevInterval * easeFactor);
     repetitions += 1;
   }
 
-  // Update ease factor: EF' = EF + (0.1 - (5-q) * (0.08 + (5-q) * 0.02))
   easeFactor = easeFactor + (0.1 - (5 - rating) * (0.08 + (5 - rating) * 0.02));
-
-  // Minimum ease factor of 1.3
   if (easeFactor < 1.3) easeFactor = 1.3;
 
   const nextReview = new Date();
@@ -71,14 +46,13 @@ export function sm2(
 
 export interface ReviewInput {
   cardId: string;
-  rating: number; // 0-5
+  rating: number;
 }
 
-export function reviewCard(userId: string, input: ReviewInput): FlashcardSRS {
-  const existing = getOne<DBFlashcardSRS>(
-    'SELECT * FROM flashcard_srs WHERE user_id = ? AND card_id = ?',
-    [userId, input.cardId]
-  );
+export async function reviewCard(userId: string, input: ReviewInput): Promise<FlashcardSRS> {
+  const { data: existing } = await supabaseAdmin
+    .from('flashcard_srs').select('*')
+    .eq('user_id', userId).eq('card_id', input.cardId).single();
 
   const ef = existing?.ease_factor ?? 2.5;
   const iv = existing?.interval ?? 0;
@@ -87,17 +61,23 @@ export function reviewCard(userId: string, input: ReviewInput): FlashcardSRS {
   const result = sm2(input.rating, ef, iv, rep);
 
   if (existing) {
-    run(
-      `UPDATE flashcard_srs SET ease_factor = ?, interval = ?, repetitions = ?,
-       next_review = ?, last_reviewed = datetime('now') WHERE user_id = ? AND card_id = ?`,
-      [result.easeFactor, result.interval, result.repetitions, result.nextReview.toISOString(), userId, input.cardId]
-    );
+    await supabaseAdmin.from('flashcard_srs').update({
+      ease_factor: result.easeFactor,
+      interval: result.interval,
+      repetitions: result.repetitions,
+      next_review: result.nextReview.toISOString(),
+      last_reviewed: new Date().toISOString(),
+    } as any).eq('user_id', userId).eq('card_id', input.cardId);
   } else {
-    run(
-      `INSERT INTO flashcard_srs (id, user_id, card_id, ease_factor, interval, repetitions, next_review)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [uuidv4(), userId, input.cardId, result.easeFactor, result.interval, result.repetitions, result.nextReview.toISOString()]
-    );
+    await supabaseAdmin.from('flashcard_srs').insert({
+      id: uuidv4(),
+      user_id: userId,
+      card_id: input.cardId,
+      ease_factor: result.easeFactor,
+      interval: result.interval,
+      repetitions: result.repetitions,
+      next_review: result.nextReview.toISOString(),
+    } as any);
   }
 
   return {
@@ -112,46 +92,58 @@ export function reviewCard(userId: string, input: ReviewInput): FlashcardSRS {
   };
 }
 
-export function getCardsForReview(userId: string, limit = 20): string[] {
+export async function getCardsForReview(userId: string, limit = 20): Promise<string[]> {
   const now = new Date().toISOString();
-  const rows = getAll<{ card_id: string }>(
-    `SELECT card_id FROM flashcard_srs
-     WHERE user_id = ? AND next_review <= ?
-     ORDER BY next_review ASC LIMIT ?`,
-    [userId, now, limit]
-  );
 
-  // Also return new cards the user hasn't started yet
-  const startedCards = getAll<{ card_id: string }>(
-    'SELECT card_id FROM flashcard_srs WHERE user_id = ?',
-    [userId]
-  );
-  const startedIds = new Set(startedCards.map(r => r.card_id));
+  // Due cards
+  const { data: dueData } = await supabaseAdmin
+    .from('flashcard_srs').select('card_id')
+    .eq('user_id', userId)
+    .lte('next_review', now)
+    .order('next_review', { ascending: true })
+    .limit(limit);
 
-  const newCards = getAll<{ id: string }>(
-    `SELECT id FROM flashcards WHERE id NOT IN (${startedIds.size > 0 ? Array(startedIds.size).fill('?').join(',') : 'NULL'}) LIMIT ?`,
-    [...Array.from(startedIds), limit - rows.length]
-  );
+  // New cards not started
+  const { data: startedData } = await supabaseAdmin
+    .from('flashcard_srs').select('card_id')
+    .eq('user_id', userId);
+  const startedIds = new Set((startedData || []).map((r: any) => r.card_id));
 
-  return [...rows.map(r => r.card_id), ...newCards.map(r => r.id)].slice(0, limit);
+  const { data: newCards } = await supabaseAdmin
+    .from('flashcards').select('id')
+    .limit(limit - ((dueData || []).length));
+
+  const newIds = (newCards || [])
+    .filter((c: any) => !startedIds.has(c.id))
+    .map((c: any) => c.id);
+
+  return [...((dueData || []).map((r: any) => r.card_id)), ...newIds].slice(0, limit);
 }
 
-export function getCardSRS(userId: string, cardId: string): FlashcardSRS | null {
-  const d = getOne<DBFlashcardSRS>(
-    'SELECT * FROM flashcard_srs WHERE user_id = ? AND card_id = ?',
-    [userId, cardId]
-  );
-  return d ? toSRS(d) : null;
-}
-
-export function getReviewStats(userId: string) {
-  const total = getOne<{ cnt: number }>('SELECT COUNT(*) as cnt FROM flashcard_srs WHERE user_id = ?', [userId]);
-  const due = getOne<{ cnt: number }>(
-    'SELECT COUNT(*) as cnt FROM flashcard_srs WHERE user_id = ? AND next_review <= ?',
-    [userId, new Date().toISOString()]
-  );
+export async function getCardSRS(userId: string, cardId: string): Promise<FlashcardSRS | null> {
+  const { data } = await supabaseAdmin
+    .from('flashcard_srs').select('*')
+    .eq('user_id', userId).eq('card_id', cardId).single();
+  if (!data) return null;
+  const r: any = data;
   return {
-    totalCards: total?.cnt ?? 0,
-    dueToday: due?.cnt ?? 0,
+    id: r.id, userId: r.user_id, cardId: r.card_id,
+    easeFactor: r.ease_factor, interval: r.interval,
+    repetitions: r.repetitions, nextReview: r.next_review,
+    lastReviewed: r.last_reviewed,
   };
+}
+
+export async function getReviewStats(userId: string) {
+  const { count: total } = await supabaseAdmin
+    .from('flashcard_srs').select('id', { count: 'exact', head: true })
+    .eq('user_id', userId);
+
+  const now = new Date().toISOString();
+  const { count: due } = await supabaseAdmin
+    .from('flashcard_srs').select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .lte('next_review', now);
+
+  return { totalCards: total ?? 0, dueToday: due ?? 0 };
 }
