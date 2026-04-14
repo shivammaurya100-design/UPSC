@@ -7,13 +7,13 @@ import * as caService from '../services/caService';
 const router = Router();
 
 // GET /ca/articles
-router.get('/articles', optionalAuth, (req: AuthenticatedRequest, res: Response) => {
+router.get('/articles', optionalAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const tag = req.query.tag as string | undefined;
     const importance = req.query.importance as string | undefined;
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
     const limit = Math.min(parseInt(req.query.limit as string) || 20, 50);
-    const articles = caService.getArticles(tag, importance, page, limit);
+    const articles = await caService.getArticles(tag, importance, page, limit);
     res.json({ success: true, data: articles, page, limit });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
@@ -21,7 +21,7 @@ router.get('/articles', optionalAuth, (req: AuthenticatedRequest, res: Response)
 });
 
 // GET /ca/articles/search?q=
-router.get('/articles/search', optionalAuth, (req: AuthenticatedRequest, res: Response) => {
+router.get('/articles/search', optionalAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const q = req.query.q as string;
     if (!q) {
@@ -29,7 +29,7 @@ router.get('/articles/search', optionalAuth, (req: AuthenticatedRequest, res: Re
       return;
     }
     const limit = Math.min(parseInt(req.query.limit as string) || 10, 30);
-    const results = caService.searchArticles(q, limit);
+    const results = await caService.searchArticles(q, limit);
     res.json({ success: true, data: results });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
@@ -37,10 +37,10 @@ router.get('/articles/search', optionalAuth, (req: AuthenticatedRequest, res: Re
 });
 
 // GET /ca/articles/:id
-router.get('/articles/:id', optionalAuth, (req: AuthenticatedRequest, res: Response) => {
+router.get('/articles/:id', optionalAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const id = req.params.id as string;
-    const article = caService.getArticleById(id);
+    const article = await caService.getArticleById(id);
     if (!article) {
       res.status(404).json({ success: false, error: 'Article not found' });
       return;
@@ -49,7 +49,7 @@ router.get('/articles/:id', optionalAuth, (req: AuthenticatedRequest, res: Respo
     // Include bookmark status if authenticated
     let isBookmarked = false;
     if (req.user) {
-      isBookmarked = caService.isBookmarked(req.user.userId, id, 'article');
+      isBookmarked = await caService.isBookmarked(req.user.userId, id, 'article');
     }
 
     res.json({ success: true, data: { ...article, isBookmarked } });
@@ -59,14 +59,14 @@ router.get('/articles/:id', optionalAuth, (req: AuthenticatedRequest, res: Respo
 });
 
 // POST /ca/bookmarks
-router.post('/bookmarks', authenticate, (req: AuthenticatedRequest, res: Response) => {
+router.post('/bookmarks', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { itemId, itemType } = req.body as { itemId: string; itemType: 'article' | 'post' | 'mcq' | 'flashcard' };
     if (!itemId || !itemType) {
       res.status(400).json({ success: false, error: 'itemId and itemType required' });
       return;
     }
-    const bookmark = caService.addBookmark(req.user!.userId, itemId, itemType);
+    const bookmark = await caService.addBookmark(req.user!.userId, itemId, itemType);
     res.status(201).json({ success: true, data: bookmark });
   } catch (err: any) {
     res.status(400).json({ success: false, error: err.message });
@@ -74,11 +74,11 @@ router.post('/bookmarks', authenticate, (req: AuthenticatedRequest, res: Respons
 });
 
 // DELETE /ca/bookmarks/:itemId
-router.delete('/bookmarks/:itemId', authenticate, (req: AuthenticatedRequest, res: Response) => {
+router.delete('/bookmarks/:itemId', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const itemType = (req.query.itemType as string) || 'article';
     const itemId = req.params.itemId as string;
-    caService.removeBookmark(req.user!.userId, itemId, itemType);
+    await caService.removeBookmark(req.user!.userId, itemId, itemType);
     res.json({ success: true, message: 'Bookmark removed' });
   } catch (err: any) {
     res.status(400).json({ success: false, error: err.message });
@@ -86,10 +86,10 @@ router.delete('/bookmarks/:itemId', authenticate, (req: AuthenticatedRequest, re
 });
 
 // GET /ca/bookmarks
-router.get('/bookmarks', authenticate, (req: AuthenticatedRequest, res: Response) => {
+router.get('/bookmarks', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const itemType = req.query.itemType as string | undefined;
-    const bookmarks = caService.getBookmarks(req.user!.userId, itemType as any);
+    const bookmarks = await caService.getBookmarks(req.user!.userId, itemType as any);
     res.json({ success: true, data: bookmarks });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });

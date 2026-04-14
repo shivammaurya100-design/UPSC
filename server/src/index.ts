@@ -59,15 +59,17 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 });
 
 // ─── Start ─────────────────────────────────────────────────────────
-
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`
+// Skip app.listen() in Vercel serverless — handler is exported via vercel.ts
+if (process.env.VERCEL !== 'true') {
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`
   ╔═══════════════════════════════════════════════════════╗
   ║   UPSC Pathfinder API v2.0                           ║
   ║   Running on http://localhost:${PORT}                  ║
   ║   Database: ${(USE_SUPABASE ? 'Supabase (PostgreSQL)' : 'SQLite (fallback)').padEnd(35)}║
   ╚═══════════════════════════════════════════════════════╝
-  `);
-});
+    `);
+  });
+}
 
 export default app;

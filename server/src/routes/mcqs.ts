@@ -13,18 +13,15 @@ const AnswerSchema = z.object({
 });
 
 // GET /mcqs — list all (with optional topic filter)
-router.get('/', optionalAuth, (req: AuthenticatedRequest, res: Response) => {
+router.get('/', optionalAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const topicId = req.query.topic as string | undefined;
     const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
     const offset = parseInt(req.query.offset as string) || 0;
 
-    let mcqs;
-    if (topicId) {
-      mcqs = mcqService.getMCQsByTopic(topicId);
-    } else {
-      mcqs = mcqService.getAllMCQs(limit, offset);
-    }
+    const mcqs = topicId
+      ? await mcqService.getMCQsByTopic(topicId)
+      : await mcqService.getAllMCQs(limit, offset);
 
     res.json({ success: true, data: mcqs, count: mcqs.length });
   } catch (err: any) {
@@ -33,7 +30,7 @@ router.get('/', optionalAuth, (req: AuthenticatedRequest, res: Response) => {
 });
 
 // GET /mcqs/search?q=
-router.get('/search', optionalAuth, (req: AuthenticatedRequest, res: Response) => {
+router.get('/search', optionalAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const q = req.query.q as string;
     if (!q || q.trim().length < 2) {
@@ -41,7 +38,7 @@ router.get('/search', optionalAuth, (req: AuthenticatedRequest, res: Response) =
       return;
     }
     const limit = Math.min(parseInt(req.query.limit as string) || 20, 50);
-    const results = mcqService.searchMCQs(q.trim(), limit);
+    const results = await mcqService.searchMCQs(q.trim(), limit);
     res.json({ success: true, data: results });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
@@ -49,10 +46,10 @@ router.get('/search', optionalAuth, (req: AuthenticatedRequest, res: Response) =
 });
 
 // GET /mcqs/:id
-router.get('/:id', optionalAuth, (req: AuthenticatedRequest, res: Response) => {
+router.get('/:id', optionalAuth, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const id = req.params.id as string;
-    const mcq = mcqService.getMCQById(id);
+    const mcq = await mcqService.getMCQById(id);
     if (!mcq) {
       res.status(404).json({ success: false, error: 'MCQ not found' });
       return;
@@ -61,9 +58,9 @@ router.get('/:id', optionalAuth, (req: AuthenticatedRequest, res: Response) => {
     // If authenticated, include user's previous answer
     let userAnswer = null;
     if (req.user) {
-      const ua = mcqService.getUserAnswerForMCQ(req.user.userId, mcq.id);
+      const ua = await mcqService.getUserAnswerForMCQ(req.user.userId, mcq.id);
       if (ua) {
-        userAnswer = { selectedOption: ua.selected_option, isCorrect: ua.is_correct === 1 };
+        userAnswer = { selectedOption: ua.selected_option, isCorrect: ua.is_correct };
       }
     }
 
@@ -82,7 +79,7 @@ router.post('/answer', authenticate, async (req: AuthenticatedRequest, res: Resp
       return;
     }
 
-    const result = mcqService.saveAnswer(req.user!.userId, parsed.data);
+    const result = await mcqService.saveAnswer(req.user!.userId, parsed.data);
     mcqService.updatePracticeStats(req.user!.userId, result.isCorrect);
 
     res.json({ success: true, data: result });
@@ -92,10 +89,10 @@ router.post('/answer', authenticate, async (req: AuthenticatedRequest, res: Resp
 });
 
 // GET /mcqs/stats/my — user's practice stats
-router.get('/stats/my', authenticate, (req: AuthenticatedRequest, res: Response) => {
+router.get('/stats/my', authenticate, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const stats = mcqService.getPracticeStats(req.user!.userId);
-    const answers = mcqService.getUserAnswers(req.user!.userId);
+    const stats = await mcqService.getPracticeStats(req.user!.userId);
+    const answers = await mcqService.getUserAnswers(req.user!.userId);
     res.json({ success: true, data: { stats, answers } });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
