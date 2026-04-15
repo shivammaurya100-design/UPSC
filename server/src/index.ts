@@ -10,6 +10,7 @@ import flashcardRoutes from './routes/flashcards';
 import communityRoutes from './routes/community';
 import caRoutes from './routes/ca';
 import adminRoutes from './routes/admin';
+import aiRoutes from './routes/ai';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
@@ -46,6 +47,7 @@ app.use('/flashcards', flashcardRoutes);
 app.use('/community', communityRoutes);
 app.use('/ca', caRoutes);
 app.use('/admin', adminRoutes);
+app.use('/ai', aiRoutes);
 
 // ─── 404 Handler ───────────────────────────────────────────────────
 

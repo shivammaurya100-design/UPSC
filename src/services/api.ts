@@ -3,6 +3,7 @@
 // Set BACKEND_MODE at the top to switch between them.
 
 import { createClient } from '@supabase/supabase-js';
+import type { AIAnswerEvaluation } from '../types/practice';
 
 // ─── Configuration ─────────────────────────────────────────────────
 // Choose your backend:
@@ -273,4 +274,43 @@ export async function checkBackendHealth(): Promise<boolean> {
     const res = await fetch(`${API_BASE}/health`);
     return res.ok;
   } catch { return false; }
+}
+
+// ─── AI Answer Evaluation ───────────────────────────────────────────
+
+export async function apiEvaluateAnswer(data: {
+  topicId: string; question: string; answer: string;
+}): Promise<{ success: boolean; data: AIAnswerEvaluation; evaluationId?: string }> {
+  return apiFetch('/ai/evaluate', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function apiGetEvaluations(page = 1): Promise<{
+  success: boolean;
+  data: { id: string; topic_id: string; question: string; score: number; evaluated_at: string }[];
+  total: number;
+}> {
+  return apiFetch(`/ai/evaluations?page=${page}`);
+}
+
+// ─── AI Doubt Assistant ─────────────────────────────────────────────
+
+export async function apiChat(
+  message: string,
+  topicId?: string,
+  history?: { role: 'user' | 'assistant'; content: string }[]
+): Promise<{ success: boolean; reply: string; messageId: string }> {
+  return apiFetch('/ai/chat', {
+    method: 'POST',
+    body: JSON.stringify({ message, topicId, history }),
+  });
+}
+
+export async function apiGetChatHistory(): Promise<{
+  success: boolean;
+  messages: { id: string; role: 'user' | 'assistant'; content: string; timestamp: string }[];
+}> {
+  return { success: true, messages: [] };
 }

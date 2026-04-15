@@ -135,6 +135,12 @@ export const TopicDetailScreen: React.FC = () => {
             {topic.isBookmarked ? '🔖' : '📑'}
           </Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.bookmarkBtn}
+          onPress={() => navigation.navigate('DoubtAssistant', { topicId: topic.id })}
+        >
+          <Text style={styles.bookmarkIcon}>🤖</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView

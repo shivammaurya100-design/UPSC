@@ -193,11 +193,13 @@ export type RootStackParamList = {
   TopicList: { category: SyllabusCategory; paper: GSPaper | 'CSAT' | 'Essay' | 'Optional' };
   TopicDetail: { topic: Topic };
   SyllabusBrowser: undefined;
+  DoubtAssistant: { topicId?: string };
   // Practice stack
   PracticeHome: undefined;
   MCQPractice: { topicId: string };
   MCQReview: { topicId: string };
   AnswerWriting: { topicId: string };
+  EvaluationHistory: undefined;
   WeaknessFocus: undefined;
   PracticeStatsDetail: undefined;
   FlashcardDeck: undefined;

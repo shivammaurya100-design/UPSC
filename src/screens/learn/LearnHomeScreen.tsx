@@ -82,6 +82,12 @@ export const LearnHomeScreen: React.FC = () => {
         >
           <Text style={styles.syllabusBtnText}>📋 Syllabus</Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.syllabusBtn}
+          onPress={() => navigation.navigate('DoubtAssistant', {})}
+        >
+          <Text style={styles.syllabusBtnText}>🤖 Ask Doubt</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Stats Card */}

@@ -18,6 +18,7 @@ import { Badge } from '../../components/ui/Badge';
 import { colors, typography, spacing, borderRadius, shadows } from '../../theme';
 import { RootStackParamList } from '../../types';
 import { AIAnswerEvaluation } from '../../types/practice';
+import { apiEvaluateAnswer } from '../../services/api';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 type RouteType = RouteProp<RootStackParamList, 'AnswerWriting'>;
@@ -88,30 +89,31 @@ export const AnswerWritingScreen: React.FC = () => {
       return;
     }
     setIsEvaluating(true);
-    // Simulate AI evaluation (Claude API integration point)
-    await new Promise<void>((resolve) => setTimeout(resolve, 2500));
-    const mockEval: AIAnswerEvaluation = {
-      score: 68,
-      relevance: 7,
-      structure: 6,
-      depth: 7,
-      currentExamples: 6,
-      overallFeedback: 'Good attempt! Your answer covers the key conceptual points well. However, you could improve by adding more recent current examples and strengthening the conclusion. The structure is mostly clear but transitions between paragraphs could be smoother.',
-      improvementPoints: [
-        'Add more recent examples (post-2020)',
-        'Strengthen the conclusion with forward-looking perspective',
-        'Use more linking phrases between paragraphs',
-        'Include relevant data/statistics to support arguments',
-      ],
-      suggestedKeywords: ['GST Council', 'state autonomy', 'fiscal federalism', 'compliance'],
-    };
-    setEvaluation(mockEval);
-    setIsEvaluating(false);
+    try {
+      const res = await apiEvaluateAnswer({
+        topicId: selectedTopic,
+        question: topicData.question,
+        answer,
+      }) as { success: boolean; data?: AIAnswerEvaluation; error?: string };
+      if (res.success && res.data) {
+        setEvaluation(res.data);
+      } else {
+        Alert.alert('Evaluation failed', res.error || 'Please try again.');
+      }
+    } catch {
+      Alert.alert('Error', 'Could not connect to the server. Please try again.');
+    } finally {
+      setIsEvaluating(false);
+    }
   };
 
   const handleClear = () => {
     setAnswer('');
     setEvaluation(null);
+  };
+
+  const handleViewHistory = () => {
+    navigation.navigate('EvaluationHistory');
   };
 
   return (
@@ -251,6 +253,13 @@ export const AnswerWritingScreen: React.FC = () => {
           <Button
             title="Clear"
             onPress={handleClear}
+            variant="ghost"
+            size="sm"
+            style={{ marginRight: spacing.sm }}
+          />
+          <Button
+            title="📜 History"
+            onPress={handleViewHistory}
             variant="ghost"
             size="sm"
             style={{ marginRight: spacing.md }}

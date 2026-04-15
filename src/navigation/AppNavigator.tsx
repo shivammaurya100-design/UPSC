@@ -12,10 +12,12 @@ import { LearnHomeScreen } from '../screens/learn/LearnHomeScreen';
 import { TopicListScreen } from '../screens/learn/TopicListScreen';
 import { TopicDetailScreen } from '../screens/learn/TopicDetailScreen';
 import { SyllabusBrowserScreen } from '../screens/learn/SyllabusBrowserScreen';
+import { DoubtAssistantScreen } from '../screens/learn/DoubtAssistantScreen';
 import { PracticeHomeScreen } from '../screens/practice/PracticeHomeScreen';
 import { MCQPracticeScreen } from '../screens/practice/MCQPracticeScreen';
 import { MCQReviewScreen } from '../screens/practice/MCQReviewScreen';
 import { AnswerWritingScreen } from '../screens/practice/AnswerWritingScreen';
+import { EvaluationHistoryScreen } from '../screens/practice/EvaluationHistoryScreen';
 import { WeaknessFocusScreen } from '../screens/practice/WeaknessFocusScreen';
 import { PracticeStatsDetailScreen } from '../screens/practice/PracticeStatsDetailScreen';
 import { FlashcardDeckScreen } from '../screens/flashcards/FlashcardDeckScreen';
@@ -63,11 +65,13 @@ const HomeStack = () => (
     <Stack.Screen name="TopicList" component={TopicListScreen} />
     <Stack.Screen name="TopicDetail" component={TopicDetailScreen} />
     <Stack.Screen name="SyllabusBrowser" component={SyllabusBrowserScreen} />
+    <Stack.Screen name="DoubtAssistant" component={DoubtAssistantScreen} />
     {/* Practice */}
     <Stack.Screen name="PracticeHome" component={PracticeHomeScreen} />
     <Stack.Screen name="MCQPractice" component={MCQPracticeScreen} />
     <Stack.Screen name="MCQReview" component={MCQReviewScreen} />
     <Stack.Screen name="AnswerWriting" component={AnswerWritingScreen} />
+    <Stack.Screen name="EvaluationHistory" component={EvaluationHistoryScreen} />
     <Stack.Screen name="WeaknessFocus" component={WeaknessFocusScreen} />
     <Stack.Screen name="PracticeStatsDetail" component={PracticeStatsDetailScreen} />
     <Stack.Screen name="FlashcardDeck" component={FlashcardDeckScreen} />

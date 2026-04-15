@@ -256,6 +256,32 @@ CREATE INDEX IF NOT EXISTS idx_mcqs_topic ON public.mcqs(topic_id);
 CREATE INDEX IF NOT EXISTS idx_news_articles_importance ON public.news_articles(importance);
 CREATE INDEX IF NOT EXISTS idx_flashcard_srs_next_review ON public.flashcard_srs(next_review);
 
+-- ─── AI Evaluations ────────────────────────────────────────────────
+CREATE TABLE public.ai_evaluations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  topic_id TEXT NOT NULL,
+  question TEXT NOT NULL,
+  user_answer TEXT NOT NULL,
+  score INTEGER NOT NULL,
+  relevance INTEGER NOT NULL,
+  structure INTEGER NOT NULL,
+  depth INTEGER NOT NULL,
+  current_examples INTEGER NOT NULL,
+  overall_feedback TEXT NOT NULL,
+  improvement_points JSONB NOT NULL,
+  suggested_keywords JSONB NOT NULL,
+  evaluated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.ai_evaluations ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can read own evaluations" ON public.ai_evaluations
+  FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own evaluations" ON public.ai_evaluations
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE INDEX idx_ai_evaluations_user ON public.ai_evaluations(user_id, evaluated_at DESC);
+
 -- ─── Seed Data ────────────────────────────────────────────────────
 -- MCQs
 INSERT INTO public.mcqs (id, topic_id, question, options, correct_option, explanation, source, year) VALUES
