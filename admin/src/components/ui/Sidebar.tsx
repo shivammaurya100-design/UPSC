@@ -11,7 +11,7 @@ const navItems = [
 ];
 
 export default function Sidebar() {
-  const { logout } = useAdmin();
+  const { admin, logout } = useAdmin();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -25,7 +25,7 @@ export default function Sidebar() {
         <div className="sidebar-logo-icon">A</div>
         <div className="sidebar-logo-text">
           UPSC Pathfinder
-          <span>Admin Panel</span>
+          <span>{admin?.name ?? 'Admin'}</span>
         </div>
       </div>
 

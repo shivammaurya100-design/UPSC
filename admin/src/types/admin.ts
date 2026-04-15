@@ -1,5 +1,12 @@
 // Admin panel TypeScript types
 
+export interface AdminUser {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+}
+
 export interface MCQ {
   id: string;
   topic_id: string;
@@ -101,9 +108,10 @@ export interface PaginatedResponse<T> {
 }
 
 export interface AdminState {
-  secret: string | null;
+  token: string | null;
+  admin: AdminUser | null;
   isAuthenticated: boolean;
-  login: (secret: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
 }
 

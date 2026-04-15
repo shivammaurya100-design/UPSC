@@ -8,7 +8,7 @@ import type { Flashcard } from '../types/admin';
 import { TOPIC_OPTIONS } from '../types/admin';
 
 export default function Flashcards() {
-  const { secret } = useAdmin();
+  const { token } = useAdmin();
   const [items, setItems] = useState<Flashcard[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -20,31 +20,31 @@ export default function Flashcards() {
   const limit = 20;
 
   const load = useCallback(() => {
-    if (!secret) return;
+    if (!token) return;
     setLoading(true);
-    getFlashcards(secret, { topic: topicFilter || undefined, page })
+    getFlashcards(token, { topic: topicFilter || undefined, page })
       .then((res) => { setItems(res.data); setTotal(res.total); })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [secret, page, topicFilter]);
+  }, [token, page, topicFilter]);
 
   useEffect(() => { load(); }, [load]);
 
   const handleCreate = async (data: any) => {
-    await createFlashcard(secret!, data);
+    await createFlashcard(token!, data);
     setShowAdd(false);
     setPage(1);
     load();
   };
 
   const handleUpdate = async (data: any) => {
-    await updateFlashcard(secret!, editing!.id, data);
+    await updateFlashcard(token!, editing!.id, data);
     setEditing(null);
     load();
   };
 
   const handleDelete = async () => {
-    await deleteFlashcard(secret!, deleting!.id);
+    await deleteFlashcard(token!, deleting!.id);
     setDeleting(null);
     load();
   };

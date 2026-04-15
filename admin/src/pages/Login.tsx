@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAdmin } from '../hooks/useAdmin';
 
 export default function Login() {
-  const [secret, setSecret] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAdmin();
@@ -11,15 +12,15 @@ export default function Login() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!secret.trim()) { setError('Please enter the admin secret'); return; }
+    if (!email.trim() || !password) { setError('Please enter email and password'); return; }
     setLoading(true);
     setError('');
-    const ok = await login(secret.trim());
+    const ok = await login(email.trim(), password);
     setLoading(false);
     if (ok) {
       navigate('/');
     } else {
-      setError('Invalid admin secret. Please check your .env file and try again.');
+      setError('Invalid email or password. Please try again.');
     }
   };
 
@@ -34,15 +35,27 @@ export default function Login() {
 
         <form className="login-form" onSubmit={handleLogin}>
           <div className="form-group">
-            <label className="form-label" htmlFor="secret">Admin Secret</label>
+            <label className="form-label" htmlFor="email">Email</label>
             <input
-              id="secret"
+              id="email"
+              type="email"
+              className="form-input"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="admin@upscpathfinder.com"
+              autoFocus
+              autoComplete="email"
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label" htmlFor="password">Password</label>
+            <input
+              id="password"
               type="password"
               className="form-input"
-              value={secret}
-              onChange={(e) => setSecret(e.target.value)}
-              placeholder="Enter admin secret..."
-              autoFocus
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter your password..."
               autoComplete="current-password"
             />
           </div>
@@ -52,12 +65,12 @@ export default function Login() {
             disabled={loading}
             style={{ width: '100%', justifyContent: 'center', marginTop: 4 }}
           >
-            {loading ? 'Verifying...' : 'Sign In'}
+            {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
 
-        <p style={{ marginTop: 20, fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-          The admin secret is set via the <code style={{ background: 'var(--surface-2)', padding: '1px 4px', borderRadius: 3 }}>ADMIN_SECRET</code> environment variable in your server's <code style={{ background: 'var(--surface-2)', padding: '1px 4px', borderRadius: 3 }}>.env</code> file.
+        <p style={{ marginTop: 20, fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.6, textAlign: 'center' }}>
+          Contact your system administrator if you have forgotten your credentials.
         </p>
       </div>
     </div>

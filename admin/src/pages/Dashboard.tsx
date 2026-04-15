@@ -5,20 +5,20 @@ import { getDashboard } from '../lib/adminApi';
 import type { DashboardStats } from '../types/admin';
 
 export default function Dashboard() {
-  const { secret } = useAdmin();
+  const { token } = useAdmin();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recentMCQs, setRecentMCQs] = useState<any[]>([]);
   const [recentArticles, setRecentArticles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!secret) return;
-    getDashboard(secret).then((res) => {
+    if (!token) return;
+    getDashboard(token).then((res) => {
       setStats(res.data.stats);
       setRecentMCQs(res.data.recentMCQs ?? []);
       setRecentArticles(res.data.recentArticles ?? []);
     }).catch(console.error).finally(() => setLoading(false));
-  }, [secret]);
+  }, [token]);
 
   const statItems = stats ? [
     { label: 'Total MCQs', value: stats.mcqs, color: 'var(--accent)', bg: 'var(--accent-light)' },

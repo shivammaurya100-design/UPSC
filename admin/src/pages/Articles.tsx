@@ -13,7 +13,7 @@ const IMPORTANCE_OPTIONS = [
 ];
 
 export default function Articles() {
-  const { secret } = useAdmin();
+  const { token } = useAdmin();
   const [items, setItems] = useState<NewsArticle[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -25,31 +25,31 @@ export default function Articles() {
   const limit = 20;
 
   const load = useCallback(() => {
-    if (!secret) return;
+    if (!token) return;
     setLoading(true);
-    getArticles(secret, { importance: importanceFilter || undefined, page })
+    getArticles(token, { importance: importanceFilter || undefined, page })
       .then((res) => { setItems(res.data); setTotal(res.total); })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [secret, page, importanceFilter]);
+  }, [token, page, importanceFilter]);
 
   useEffect(() => { load(); }, [load]);
 
   const handleCreate = async (data: any) => {
-    await createArticle(secret!, data);
+    await createArticle(token!, data);
     setShowAdd(false);
     setPage(1);
     load();
   };
 
   const handleUpdate = async (data: any) => {
-    await updateArticle(secret!, editing!.id, data);
+    await updateArticle(token!, editing!.id, data);
     setEditing(null);
     load();
   };
 
   const handleDelete = async () => {
-    await deleteArticle(secret!, deleting!.id);
+    await deleteArticle(token!, deleting!.id);
     setDeleting(null);
     load();
   };

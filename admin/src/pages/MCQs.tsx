@@ -9,7 +9,7 @@ import type { MCQ } from '../types/admin';
 import { TOPIC_OPTIONS } from '../types/admin';
 
 export default function MCQs() {
-  const { secret } = useAdmin();
+  const { token } = useAdmin();
   const [items, setItems] = useState<MCQ[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -24,31 +24,31 @@ export default function MCQs() {
   const limit = 20;
 
   const load = useCallback(() => {
-    if (!secret) return;
+    if (!token) return;
     setLoading(true);
-    getMCQs(secret, { topic: topicFilter || undefined, page, search: search || undefined })
+    getMCQs(token, { topic: topicFilter || undefined, page, search: search || undefined })
       .then((res) => { setItems(res.data); setTotal(res.total); })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [secret, page, topicFilter, search]);
+  }, [token, page, topicFilter, search]);
 
   useEffect(() => { load(); }, [load]);
 
   const handleCreate = async (data: any) => {
-    await createMCQ(secret!, data);
+    await createMCQ(token!, data);
     setShowAdd(false);
     setPage(1);
     load();
   };
 
   const handleUpdate = async (data: any) => {
-    await updateMCQ(secret!, editing!.id, data);
+    await updateMCQ(token!, editing!.id, data);
     setEditing(null);
     load();
   };
 
   const handleDelete = async () => {
-    await deleteMCQ(secret!, deleting!.id);
+    await deleteMCQ(token!, deleting!.id);
     setDeleting(null);
     load();
   };
@@ -57,7 +57,7 @@ export default function MCQs() {
     if (!bulkFile) return;
     const text = await bulkFile.text();
     const items = JSON.parse(text);
-    const res = await bulkImportMCQs(secret!, items);
+    const res = await bulkImportMCQs(token!, items);
     setBulkResult(`Imported ${res.imported} MCQs successfully!`);
     setBulkFile(null);
     setTimeout(() => { setBulkResult(''); load(); }, 2000);

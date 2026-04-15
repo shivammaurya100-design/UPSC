@@ -13,7 +13,7 @@ const STAGE_OPTIONS = [
 ];
 
 export default function Users() {
-  const { secret } = useAdmin();
+  const { token } = useAdmin();
   const [items, setItems] = useState<UserProfile[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -22,18 +22,18 @@ export default function Users() {
   const limit = 20;
 
   const load = useCallback(() => {
-    if (!secret) return;
+    if (!token) return;
     setLoading(true);
-    getUsers(secret, page)
+    getUsers(token, page)
       .then((res) => { setItems(res.data); setTotal(res.total); })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [secret, page]);
+  }, [token, page]);
 
   useEffect(() => { load(); }, [load]);
 
   const handleUpdate = async (data: { examStage?: string; optionalSubject?: string; targetYear?: number }) => {
-    await updateUser(secret!, editing!.id, data);
+    await updateUser(token!, editing!.id, data);
     setEditing(null);
     load();
   };

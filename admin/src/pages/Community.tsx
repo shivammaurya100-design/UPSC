@@ -5,7 +5,7 @@ import Modal from '../components/ui/Modal';
 import type { CommunityPost, Comment } from '../types/admin';
 
 export default function Community() {
-  const { secret } = useAdmin();
+  const { token } = useAdmin();
   const [activeTab, setActiveTab] = useState<'posts' | 'comments'>('posts');
 
   // Posts state
@@ -27,39 +27,39 @@ export default function Community() {
   const limit = 20;
 
   const loadPosts = useCallback(() => {
-    if (!secret) return;
+    if (!token) return;
     setPostsLoading(true);
-    getPosts(secret, { page: postPage })
+    getPosts(token, { page: postPage })
       .then((res) => { setPosts(res.data); setPostTotal(res.total); })
       .catch(console.error)
       .finally(() => setPostsLoading(false));
-  }, [secret, postPage]);
+  }, [token, postPage]);
 
   const loadComments = useCallback(() => {
-    if (!secret) return;
+    if (!token) return;
     setCommentsLoading(true);
-    getComments(secret, commentPage)
+    getComments(token, commentPage)
       .then((res) => { setComments(res.data); setCommentTotal(res.total); })
       .catch(console.error)
       .finally(() => setCommentsLoading(false));
-  }, [secret, commentPage]);
+  }, [token, commentPage]);
 
   useEffect(() => { loadPosts(); }, [loadPosts]);
   useEffect(() => { loadComments(); }, [loadComments]);
 
   const handlePin = async (post: CommunityPost) => {
-    await pinPost(secret!, post.id, !post.is_pinned);
+    await pinPost(token!, post.id, !post.is_pinned);
     loadPosts();
   };
 
   const handleDeletePost = async () => {
-    await deletePost(secret!, confirmPost!.id);
+    await deletePost(token!, confirmPost!.id);
     setConfirmPost(null);
     loadPosts();
   };
 
   const handleDeleteComment = async () => {
-    await deleteComment(secret!, confirmComment!.id);
+    await deleteComment(token!, confirmComment!.id);
     setConfirmComment(null);
     loadComments();
   };

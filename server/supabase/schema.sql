@@ -247,6 +247,30 @@ ALTER FUNCTION public.increment_comments(UUID) SECURITY DEFINER;
 GRANT EXECUTE ON FUNCTION public.increment_views(UUID) TO postgres, anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.increment_comments(UUID) TO postgres, anon, authenticated, service_role;
 
+-- ─── Admin Users ─────────────────────────────────────────────────
+CREATE TABLE public.admins (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  name TEXT NOT NULL DEFAULT 'Admin',
+  role TEXT NOT NULL DEFAULT 'admin',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.admins ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Admins can read themselves" ON public.admins FOR SELECT USING (true);
+CREATE POLICY "No direct inserts via anon/auth" ON public.admins FOR INSERT WITH CHECK (false);
+CREATE POLICY "Admins can update themselves" ON public.admins FOR UPDATE USING (true);
+
+-- Seed default admin (password: admin123 — CHANGE THIS IMMEDIATELY AFTER DEPLOYMENT)
+-- Hash generated with bcrypt, rounds=12
+INSERT INTO public.admins (email, password_hash, name)
+VALUES (
+  'admin@upscpathfinder.com',
+  '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.9kRUVzZ5wW9Wy',
+  'Super Admin'
+) ON CONFLICT (email) DO NOTHING;
+
 -- ─── Indexes ───────────────────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_mcq_answers_user ON public.mcq_answers(user_id);
 CREATE INDEX IF NOT EXISTS idx_flashcard_srs_user_card ON public.flashcard_srs(user_id, card_id);

@@ -10,6 +10,7 @@ import flashcardRoutes from './routes/flashcards';
 import communityRoutes from './routes/community';
 import caRoutes from './routes/ca';
 import adminRoutes from './routes/admin';
+import adminAuthRoutes from './routes/adminAuth';
 import aiRoutes from './routes/ai';
 
 const app = express();
@@ -46,7 +47,8 @@ app.use('/mcqs', mcqRoutes);
 app.use('/flashcards', flashcardRoutes);
 app.use('/community', communityRoutes);
 app.use('/ca', caRoutes);
-app.use('/admin', adminRoutes);
+app.use('/admin', adminAuthRoutes); // login + me (public)
+app.use('/admin', adminRoutes);    // all CRUD routes (JWT-protected)
 app.use('/ai', aiRoutes);
 
 // ─── 404 Handler ───────────────────────────────────────────────────
